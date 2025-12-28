@@ -37,7 +37,7 @@ class UserHomePage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // --- PHẦN 1: CẬP NHẬT THÔNG TIN (Backend Test) ---
-            _buildBackendTestSection(context, userService),
+            // _buildBackendTestSection(context, userService),
 
             // --- PHẦN 2: DANH SÁCH VỊ TRÍ ---
             const _SectionHeader(title: 'Vị trí thực tập khả dụng'),
@@ -183,32 +183,32 @@ class UserHomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildBackendTestSection(BuildContext context, UserService service) {
-    return Center(
-      child: Card(
-        margin: const EdgeInsets.all(16),
-        color: Colors.blue.shade50,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              const Text('Cập nhật thông tin (Backend Test)', style: TextStyle(fontWeight: FontWeight.bold)),
-              ElevatedButton(
-                onPressed: () async {
-                  await service.updateStudentProfile(
-                    fullName: "Nguyen Le Lu", phoneNumber: "0987654321",
-                    university: "Hutech", major: "Software Engineering", skills: ["Flutter", "Dart"],
-                  );
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cập nhật thành công!')));
-                },
-                child: const Text('Gửi dữ liệu mẫu'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  // Widget _buildBackendTestSection(BuildContext context, UserService service) {
+  //   return Center(
+  //     child: Card(
+  //       margin: const EdgeInsets.all(16),
+  //       color: Colors.blue.shade50,
+  //       child: Padding(
+  //         padding: const EdgeInsets.all(16.0),
+  //         child: Column(
+  //           children: [
+  //             const Text('Cập nhật thông tin (Backend Test)', style: TextStyle(fontWeight: FontWeight.bold)),
+  //             ElevatedButton(
+  //               onPressed: () async {
+  //                 await service.updateStudentProfile(
+  //                   fullName: "Nguyen Le Lu", phoneNumber: "0987654321",
+  //                   university: "Hutech", major: "Software Engineering", skills: ["Flutter", "Dart"],
+  //                 );
+  //                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cập nhật thành công!')));
+  //               },
+  //               child: const Text('Gửi dữ liệu mẫu'),
+  //             ),
+  //           ],
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
 }
 
 class _SectionHeader extends StatelessWidget {
