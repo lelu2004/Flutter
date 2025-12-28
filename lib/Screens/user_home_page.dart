@@ -1,13 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:my_firebase_app/Screens/user_service.dart';
+import 'package:my_firebase_app/Screens/application_service.dart';
 
 class UserHomePage extends StatelessWidget {
   const UserHomePage({super.key});
 
+  // Hàm lấy tiêu đề vị trí từ ID
+  Future<String> _getPositionTitle(String positionId) async {
+    try {
+      var doc = await FirebaseFirestore.instance.collection('positions').doc(positionId).get();
+      return doc.exists ? (doc.data() as Map)['title'] ?? 'Vị trí không tên' : 'Vị trí đã đóng';
+    } catch (e) {
+      return 'Lỗi tải dữ liệu';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final userId = FirebaseAuth.instance.currentUser!.uid;
+    final userService = UserService();
 
     return Scaffold(
       appBar: AppBar(
@@ -15,160 +28,197 @@ class UserHomePage extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () async {
-              final bool? confirm = await showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Xác nhận đăng xuất'),
-                  content: const Text('Bạn có chắc muốn đăng xuất?'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Hủy'),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Đăng xuất'),
-                    ),
-                  ],
+            onPressed: () async => await FirebaseAuth.instance.signOut(),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // --- PHẦN 1: CẬP NHẬT THÔNG TIN (Backend Test) ---
+            _buildBackendTestSection(context, userService),
+
+            // --- PHẦN 2: DANH SÁCH VỊ TRÍ ---
+            const _SectionHeader(title: 'Vị trí thực tập khả dụng'),
+            _buildAvailablePositions(userId),
+
+            const Divider(height: 30),
+
+            // --- PHẦN 3: ĐƠN ĐANG XỬ LÝ ---
+            const _SectionHeader(title: 'Đơn đang xin thực tập'),
+            _buildActiveApplications(userId),
+
+            const Divider(height: 30, thickness: 2, color: Colors.blue),
+
+            // --- PHẦN 4: LỊCH SỬ THỰC TẬP (Yêu cầu 5) ---
+            const _SectionHeader(title: '⭐ THÀNH TÍCH THỰC TẬP (Lịch sử)'),
+            _buildCompletedHistory(userId),
+
+            const SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Widget hiển thị lịch sử các kỳ thực tập đã hoàn thành
+  Widget _buildCompletedHistory(String userId) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('applications')
+          .where('studentId', isEqualTo: userId)
+          .where('status', isEqualTo: 'completed')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final history = snapshot.data!.docs;
+        if (history.isEmpty) return const Padding(
+          padding: EdgeInsets.only(left: 16.0),
+          child: Text('Bạn chưa có kỳ thực tập nào hoàn thành.'),
+        );
+
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: history.length,
+          itemBuilder: (context, index) {
+            final data = history[index].data() as Map<String, dynamic>;
+            return Card(
+              color: Colors.green.shade50,
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: ListTile(
+                leading: const Icon(Icons.verified, color: Colors.green),
+                title: FutureBuilder<String>(
+                  future: _getPositionTitle(data['positionId']),
+                  builder: (context, res) => Text(res.data ?? '...', style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
-              );
-              if (confirm == true) {
-                await FirebaseAuth.instance.signOut();
-              }
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text('Danh sách vị trí thực tập khả dụng', style: TextStyle(fontSize: 18)),
-          ),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('positions')
-                  .where('isActive', isEqualTo: true)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) return const Center(child: Text('Lỗi tải vị trí'));
-                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                subtitle: Text('Đã hoàn thành: ${data['submittedAt']?.toDate().toString().split(' ')[0]}'),
+                trailing: const Text('COMPLETED', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
-                final positions = snapshot.data!.docs;
-                if (positions.isEmpty) return const Center(child: Text('Chưa có vị trí nào khả dụng'));
+  // Widget hiển thị đơn đang trong quá trình xử lý
+  Widget _buildActiveApplications(String userId) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('applications')
+          .where('studentId', isEqualTo: userId)
+          .where('status', isNotEqualTo: 'completed')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) return const Center(child: Text('Cần tạo Index trên Firebase Console'));
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
 
-                return ListView.builder(
-                  itemCount: positions.length,
-                  itemBuilder: (context, index) {
-                    final data = positions[index].data() as Map<String, dynamic>;
-                    final positionId = positions[index].id;
-                    final companyId = data['companyId']; // Đảm bảo lấy companyId từ positions
+        final apps = snapshot.data!.docs;
+        if (apps.isEmpty) return const Padding(
+          padding: EdgeInsets.only(left: 16.0),
+          child: Text('Không có đơn nào đang chờ xử lý.'),
+        );
 
-                    return ListTile(
-                      title: Text(data['title'] ?? 'Vị trí không tên'),
-                      subtitle: Text(data['description'] ?? ''),
-                      trailing: ElevatedButton(
-                        onPressed: () async {
-                          try {
-                            print("Backend: Bắt đầu xử lý nộp/cập nhật đơn cho Position: $positionId");
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: apps.length,
+          itemBuilder: (context, index) {
+            final data = apps[index].data() as Map<String, dynamic>;
+            return ListTile(
+              title: FutureBuilder<String>(
+                future: _getPositionTitle(data['positionId']),
+                builder: (context, res) => Text('Vị trí: ${res.data ?? "..."}'),
+              ),
+              subtitle: Text('Trạng thái hiện tại: ${data['status']}'),
+            );
+          },
+        );
+      },
+    );
+  }
 
-                            // 1. Truy vấn tìm đơn cũ của sinh viên này cho vị trí này
-                            final existingApp = await FirebaseFirestore.instance
-                                .collection('applications')
-                                .where('studentId', isEqualTo: userId)
-                                .where('positionId', isEqualTo: positionId)
-                                .get();
+  Widget _buildAvailablePositions(String userId) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('positions').where('isActive', isEqualTo: true).snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final pos = snapshot.data!.docs;
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: pos.length,
+          itemBuilder: (context, index) {
+            final data = pos[index].data() as Map<String, dynamic>;
+            final positionId = pos[index].id;
+            final companyId = data['companyId'];
 
-                            if (existingApp.docs.isNotEmpty) {
-                              // TRƯỜNG HỢP 1: Đã có đơn -> Tiến hành CẬP NHẬT thời gian
-                              String docId = existingApp.docs.first.id;
-                              print("Backend: Đã tìm thấy đơn cũ (ID: $docId). Đang cập nhật thời gian mới...");
-
-                              await FirebaseFirestore.instance
-                                  .collection('applications')
-                                  .doc(docId)
-                                  .update({
-                                'submittedAt': FieldValue.serverTimestamp(), // Cập nhật mốc thời gian mới nhất từ server
-                                'status': 'submitted', // Reset lại trạng thái nếu cần
-                              });
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Đã cập nhật lại thời gian nộp đơn mới nhất!'),
-                                  backgroundColor: Colors.blue,
-                                ),
-                              );
-                            } else {
-                              // TRƯỜNG HỢP 2: Chưa có đơn -> Tạo MỚI hoàn toàn
-                              print("Backend: Chưa có đơn cũ. Đang tạo đơn mới...");
-                              await FirebaseFirestore.instance.collection('applications').add({
-                                'studentId': userId,
-                                'positionId': positionId,
-                                'companyId': companyId,
-                                'status': 'submitted',
-                                'submittedAt': FieldValue.serverTimestamp(),
-                                'cvUrl': 'link-cv-gia-lap'
-                              });
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Nộp đơn lần đầu thành công!'),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                            }
-                            print("Backend: Thao tác dữ liệu hoàn tất.");
-                          } catch (e) {
-                            print('Backend Error: $e');
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Lỗi hệ thống: $e'), backgroundColor: Colors.red),
-                            );
-                          }
-                        },
-                        child: const Text('Nộp đơn'),
-                      ),
+            return ListTile(
+              title: Text(data['title'] ?? 'Vị trí không tên'),
+              subtitle: Text(data['description'] ?? ''),
+              trailing: ElevatedButton(
+                onPressed: () async {
+                  try {
+                    await ApplicationService().submitApplication(
+                      positionId: positionId,
+                      companyId: companyId,
                     );
-                  },
-                );
-              },
-            ),
-          ),
-          const Divider(),
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text('Lịch sử đơn ứng tuyển của bạn', style: TextStyle(fontSize: 18)),
-          ),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('applications')
-                  .where('studentId', isEqualTo: userId)
-                  .orderBy('submittedAt', descending: true)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) return const Center(child: Text('Lỗi tải lịch sử'));
-                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-
-                final apps = snapshot.data!.docs;
-                if (apps.isEmpty) return const Center(child: Text('Chưa có đơn nào'));
-
-                return ListView.builder(
-                  itemCount: apps.length,
-                  itemBuilder: (context, index) {
-                    final data = apps[index].data() as Map<String, dynamic>;
-                    return ListTile(
-                      title: Text('Vị trí ID: ${data['positionId']}'),
-                      subtitle: Text('Trạng thái: ${data['status']}'),
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Nộp đơn thành công!'), backgroundColor: Colors.green),
                     );
-                  },
-                );
-              },
-            ),
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+                    );
+                  }
+                },
+                child: const Text('Nộp đơn'),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildBackendTestSection(BuildContext context, UserService service) {
+    return Center(
+      child: Card(
+        margin: const EdgeInsets.all(16),
+        color: Colors.blue.shade50,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              const Text('Cập nhật thông tin (Backend Test)', style: TextStyle(fontWeight: FontWeight.bold)),
+              ElevatedButton(
+                onPressed: () async {
+                  await service.updateStudentProfile(
+                    fullName: "Nguyen Le Lu", phoneNumber: "0987654321",
+                    university: "Hutech", major: "Software Engineering", skills: ["Flutter", "Dart"],
+                  );
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cập nhật thành công!')));
+                },
+                child: const Text('Gửi dữ liệu mẫu'),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader({required this.title});
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
     );
   }
 }

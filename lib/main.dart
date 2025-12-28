@@ -11,17 +11,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  if (kIsWeb) {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } else {
-    // Các nền tảng khác nếu có
-    await Firebase.initializeApp();
-  }
-
+  WidgetsFlutterBinding.ensureInitialized(); // Bắt buộc
+  await Firebase.initializeApp(); // Bắt buộc để dùng Firebase
   runApp(MyApp());
 }
 

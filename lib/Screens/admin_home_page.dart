@@ -44,7 +44,7 @@ class AdminHomePage extends StatelessWidget {
                         icon: const Icon(Icons.delete),
                         onPressed: () {
                           // TODO: Xóa program (chỉ admin)
-                          FirebaseFirestore.instance.collection('internshipPrograms').doc(programs[index].id).delete();
+                          FirebaseFirestore.instance.collection('positions').doc(programs[index].id).delete();
                         },
                       ),
                     );

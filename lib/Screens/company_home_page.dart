@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:my_firebase_app/Screens/position_service.dart';
 
 class CompanyHomePage extends StatelessWidget {
   const CompanyHomePage({super.key});
@@ -34,7 +35,7 @@ class CompanyHomePage extends StatelessWidget {
     } catch (e) {
       print('Lỗi lấy tiêu đề vị trí: $e');
     }
-    return 'ID: $positionId'; // Trả về ID nếu không tìm thấy hoặc lỗi
+    return 'ID: $positionId';
   }
 
   @override
@@ -80,6 +81,7 @@ class CompanyHomePage extends StatelessWidget {
                     final data = apps[index].data() as Map<String, dynamic>;
                     final studentId = data['studentId'] ?? '';
                     final positionId = data['positionId'] ?? '';
+                    final status = data['status'] ?? 'submitted'; // Lấy trạng thái hiện tại
 
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -99,7 +101,6 @@ class CompanyHomePage extends StatelessWidget {
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // FutureBuilder mới để lấy tiêu đề vị trí
                             FutureBuilder<String>(
                               future: _getPositionTitle(positionId),
                               builder: (context, titleSnapshot) {
@@ -109,30 +110,56 @@ class CompanyHomePage extends StatelessWidget {
                                 return Text('Vị trí: ${titleSnapshot.data}');
                               },
                             ),
-                            Text('Trạng thái: ${data['status']}'),
+                            Text('Trạng thái: $status'),
                           ],
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.check, color: Colors.green),
-                              onPressed: () {
-                                FirebaseFirestore.instance
-                                    .collection('applications')
-                                    .doc(apps[index].id)
-                                    .update({'status': 'approved'});
-                              },
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.close, color: Colors.red),
-                              onPressed: () {
-                                FirebaseFirestore.instance
-                                    .collection('applications')
-                                    .doc(apps[index].id)
-                                    .update({'status': 'rejected'});
-                              },
-                            ),
+                            // 1. Nếu đang chờ duyệt (submitted) -> Hiện nút V và X
+                            if (status == 'submitted') ...[
+                              IconButton(
+                                icon: const Icon(Icons.check, color: Colors.green),
+                                tooltip: 'Chấp nhận',
+                                onPressed: () {
+                                  FirebaseFirestore.instance
+                                      .collection('applications')
+                                      .doc(apps[index].id)
+                                      .update({'status': 'approved'});
+                                },
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close, color: Colors.red),
+                                tooltip: 'Từ chối',
+                                onPressed: () {
+                                  FirebaseFirestore.instance
+                                      .collection('applications')
+                                      .doc(apps[index].id)
+                                      .update({'status': 'rejected'});
+                                },
+                              ),
+                            ],
+
+                            // 2. Nếu đã duyệt (approved) -> Hiện nút Hoàn thành
+                            if (status == 'approved')
+                              IconButton(
+                                icon: const Icon(Icons.assignment_turned_in, color: Colors.blue),
+                                tooltip: 'Xác nhận hoàn thành',
+                                onPressed: () {
+                                  FirebaseFirestore.instance
+                                      .collection('applications')
+                                      .doc(apps[index].id)
+                                      .update({'status': 'completed'});
+                                },
+                              ),
+
+                            // 3. Nếu đã hoàn thành (completed) -> Hiện icon tích xanh
+                            if (status == 'completed')
+                              const Icon(Icons.verified, color: Colors.blue),
+
+                            // 4. Nếu bị từ chối (rejected) -> Hiện icon chặn
+                            if (status == 'rejected')
+                              const Icon(Icons.block, color: Colors.grey),
                           ],
                         ),
                       ),
@@ -145,8 +172,20 @@ class CompanyHomePage extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: ElevatedButton(
-              onPressed: () {
-                // TODO: Thêm logic tạo vị trí mới
+              onPressed: () async {
+                try {
+                  await PositionService().createPosition(
+                      title: "Intern Firebase Developer",
+                      description: "Thực tập phát triển ứng dụng di động",
+                      requirements: ["Dart", "Flutter", "Firebase"],
+                      startDate: DateTime.now()
+                  );
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Tạo vị trí thực tập mẫu thành công!')),
+                  );
+                } catch (e) {
+                  print("Lỗi: $e");
+                }
               },
               child: const Text('Tạo vị trí mới'),
             ),

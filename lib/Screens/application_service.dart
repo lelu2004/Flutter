@@ -4,14 +4,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 class ApplicationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  // Thêm vào một service mới hoặc CompanyHomePage
+
+  // 1. Của bạn: Hàm xác nhận hoàn thành thực tập
   Future<void> completeInternship(String appId) async {
-    await FirebaseFirestore.instance
+    await _firestore
         .collection('applications')
         .doc(appId)
         .update({'status': 'completed'});
   }
 
+  // 2. Của bạn: Hàm nộp đơn có kiểm tra trùng lặp (Rất tốt cho Yêu cầu 3)
   Future<void> submitApplication({
     required String positionId,
     required String companyId,
@@ -20,7 +22,6 @@ class ApplicationService {
     final studentId = _auth.currentUser?.uid;
     if (studentId == null) throw Exception("Bạn cần đăng nhập để nộp đơn.");
 
-    // [QUAN TRỌNG]: Kiểm tra xem sinh viên này đã nộp đơn cho vị trí này chưa
     final checkDuplicate = await _firestore
         .collection('applications')
         .where('studentId', isEqualTo: studentId)
@@ -31,7 +32,6 @@ class ApplicationService {
       throw Exception("Bạn đã nộp đơn ứng tuyển cho vị trí này rồi.");
     }
 
-    // Nếu chưa có, tiến hành lưu đơn mới
     await _firestore.collection('applications').add({
       'studentId': studentId,
       'positionId': positionId,
@@ -40,5 +40,24 @@ class ApplicationService {
       'submittedAt': FieldValue.serverTimestamp(),
       'cvUrl': cvUrl,
     });
+  }
+
+  // 3. Bổ sung thêm: Truy vấn lịch sử THEO SINH VIÊN (Yêu cầu số 5)
+  Stream<QuerySnapshot> getStudentInternshipHistory(String studentId) {
+    return _firestore
+        .collection('applications')
+        .where('studentId', isEqualTo: studentId)
+        .where('status', isEqualTo: 'completed') // Chỉ lấy kỳ thực tập đã hoàn thành
+        .orderBy('submittedAt', descending: true)
+        .snapshots();
+  }
+
+  // 4. Bổ sung thêm: Truy vấn lịch sử THEO CHƯƠNG TRÌNH (Dùng cho Admin/Company)
+  Stream<QuerySnapshot> getProgramHistory(String companyId) {
+    return _firestore
+        .collection('applications')
+        .where('companyId', isEqualTo: companyId)
+        .where('status', isEqualTo: 'completed')
+        .snapshots();
   }
 }
