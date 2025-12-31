@@ -19,7 +19,6 @@ class _LoginScreenState extends State<LoginScreen>{
         _emailController.text,
         _passwordController.text,
       );
-      // Navigate to home screen on successful login
     } catch (e) {
       setState(() {
         _errorMessage = 'Login failed. Please check your credentials.';
