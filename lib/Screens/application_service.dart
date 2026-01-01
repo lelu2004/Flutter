@@ -12,7 +12,21 @@ class ApplicationService {
         .doc(appId)
         .update({'status': 'completed'});
   }
+  Future<int> getApprovedCount(String positionId) async {
+    try {
+      AggregateQuerySnapshot snapshot = await _firestore
+          .collection('applications')
+          .where('positionId', isEqualTo:  positionId)
+          .where('status', isEqualTo: 'approved')
+          .count() // Sử dụng hàm count() của Firebase
+          .get();
 
+      return snapshot.count ?? 0;
+    } catch (e) {
+      print("Lỗi khi đếm số lượng: $e");
+      return 0;
+    }
+  }
   // 2. Của bạn: Hàm nộp đơn có kiểm tra trùng lặp (Rất tốt cho Yêu cầu 3)
   Future<void> submitApplication({
     required String positionId,
@@ -62,7 +76,7 @@ class ApplicationService {
     return _firestore
         .collection('applications')
         .where('studentId', isEqualTo: studentId)
-        .where('status', isEqualTo: 'completed') // Chỉ lấy kỳ thực tập đã hoàn thành
+        .where('status', isEqualTo: 'completed')
         .orderBy('submittedAt', descending: true)
         .snapshots();
   }
