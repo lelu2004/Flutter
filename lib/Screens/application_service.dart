@@ -22,6 +22,22 @@ class ApplicationService {
     final studentId = _auth.currentUser?.uid;
     if (studentId == null) throw Exception("Bạn cần đăng nhập để nộp đơn.");
 
+    DocumentSnapshot posDoc = await _firestore.collection('positions').doc(positionId).get();
+    if (!posDoc.exists) throw Exception("Vị trí không tồn tại.");
+
+    final posData = posDoc.data() as Map<String, dynamic>;
+    int maxSlots = posData['maxSlots'] ?? 10;
+
+    final approvedApps = await _firestore
+        .collection('applications')
+        .where('positionId', isEqualTo: positionId)
+        .where('status', isEqualTo: 'approved')
+        .get();
+
+    if (approvedApps.docs.length >= maxSlots) {
+      throw Exception("Vị trí này đã tuyển đủ người.");
+    }
+
     final checkDuplicate = await _firestore
         .collection('applications')
         .where('studentId', isEqualTo: studentId)
@@ -31,7 +47,6 @@ class ApplicationService {
     if (checkDuplicate.docs.isNotEmpty) {
       throw Exception("Bạn đã nộp đơn ứng tuyển cho vị trí này rồi.");
     }
-
     await _firestore.collection('applications').add({
       'studentId': studentId,
       'positionId': positionId,

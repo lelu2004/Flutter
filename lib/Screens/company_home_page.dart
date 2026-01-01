@@ -3,39 +3,108 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:my_firebase_app/Screens/position_service.dart';
 
-class CompanyHomePage extends StatelessWidget {
+class CompanyHomePage extends StatefulWidget {
   const CompanyHomePage({super.key});
 
-  // Hàm lấy tên sinh viên từ UID
-  Future<String> _getStudentName(String uid) async {
-    try {
-      DocumentSnapshot userDoc =
-      await FirebaseFirestore.instance.collection('users').doc(uid).get();
-      if (userDoc.exists) {
-        final data = userDoc.data() as Map<String, dynamic>;
-        return data['fullName'] ?? 'Không rõ tên';
-      }
-    } catch (e) {
-      print('Lỗi lấy tên sinh viên: $e');
-    }
-    return 'Lỗi tải tên';
+  @override
+  State<CompanyHomePage> createState() => _CompanyHomePageState();
+}
+
+class _CompanyHomePageState extends State<CompanyHomePage> {
+  String selectedTab = 'submitted';
+
+  void _showCreatePositionDialog() {
+    final titleController = TextEditingController();
+    final descController = TextEditingController();
+    final slotsController = TextEditingController(text: '1'); // Mặc định tuyển 1 người
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Đăng Tuyển Vị Trí Mới'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: titleController, decoration: const InputDecoration(labelText: 'Tiêu đề (Vd: Intern Flutter)')),
+              TextField(controller: descController, decoration: const InputDecoration(labelText: 'Mô tả công việc')),
+              TextField(
+                controller: slotsController,
+                decoration: const InputDecoration(labelText: 'Số lượng cần tuyển (Slots)'),
+                keyboardType: TextInputType.number, // Chỉ cho nhập số
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                int slots = int.tryParse(slotsController.text) ?? 1;
+                await PositionService().createPosition(
+                  title: titleController.text.trim(),
+                  description: descController.text.trim(),
+                  requirements: ['Flutter', 'Firebase'], // Có thể mở rộng thêm field nhập list
+                  startDate: DateTime.now(),
+                  maxSlots: slots, // Truyền giá trị từ người dùng nhập
+                );
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tạo vị trí thành công!')));
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+              }
+            },
+            child: const Text('Đăng tuyển'),
+          ),
+        ],
+      ),
+    );
   }
 
-  // Hàm lấy tiêu đề vị trí thực tập từ positionId
+  // ================= GET STUDENT NAME (FIXED) =================
+  Future<String> _getStudentName(String uid) async {
+    try {
+      // 1️⃣ Try Firestore
+      final userDoc =
+      await FirebaseFirestore.instance.collection('users').doc(uid).get();
+
+      if (userDoc.exists) {
+        final data = userDoc.data() as Map<String, dynamic>;
+        if (data['fullName'] != null && data['fullName'].toString().isNotEmpty) {
+          return data['fullName'];
+        }
+      }
+
+      // 2️⃣ Fallback to Firebase Auth displayName
+      final authUser = FirebaseAuth.instance.currentUser;
+      if (authUser != null &&
+          authUser.uid == uid &&
+          authUser.displayName != null) {
+        return authUser.displayName!;
+      }
+    } catch (e) {
+      debugPrint('Error getting student name: $e');
+    }
+
+    // 3️⃣ Final fallback
+    return 'Unknown';
+  }
+
+  // ================= GET POSITION TITLE =================
   Future<String> _getPositionTitle(String positionId) async {
     try {
-      DocumentSnapshot posDoc = await FirebaseFirestore.instance
+      final doc = await FirebaseFirestore.instance
           .collection('positions')
           .doc(positionId)
           .get();
-      if (posDoc.exists) {
-        final data = posDoc.data() as Map<String, dynamic>;
-        return data['title'] ?? 'Vị trí không tên';
+      if (doc.exists) {
+        return (doc.data() as Map<String, dynamic>)['title'] ?? 'No title';
       }
     } catch (e) {
-      print('Lỗi lấy tiêu đề vị trí: $e');
+      debugPrint(e.toString());
     }
-    return 'ID: $positionId';
+    return 'Position closed';
   }
 
   @override
@@ -48,105 +117,140 @@ class CompanyHomePage extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () async => await FirebaseAuth.instance.signOut(),
+            onPressed: () async => FirebaseAuth.instance.signOut(),
           ),
         ],
       ),
       body: Column(
         children: [
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text('Danh sách đơn ứng tuyển (Trượt trái để xóa)', style: TextStyle(fontSize: 18)),
+          const SizedBox(height: 12),
+
+          // ================= TABS =================
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ChoiceChip(
+                label: const Text('Pending'),
+                selected: selectedTab == 'submitted',
+                onSelected: (_) =>
+                    setState(() => selectedTab = 'submitted'),
+              ),
+              const SizedBox(width: 8),
+              ChoiceChip(
+                label: const Text('History'),
+                selected: selectedTab == 'history',
+                onSelected: (_) =>
+                    setState(() => selectedTab = 'history'),
+              ),
+            ],
           ),
+
+          const SizedBox(height: 12),
+
+          // ================= APPLICATION LIST =================
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
+              stream: selectedTab == 'submitted'
+                  ? FirebaseFirestore.instance
                   .collection('applications')
                   .where('companyId', isEqualTo: companyId)
+                  .where('status', isEqualTo: 'submitted')
+                  .snapshots()
+                  : FirebaseFirestore.instance
+                  .collection('applications')
+                  .where('companyId', isEqualTo: companyId)
+                  .where(
+                'status',
+                whereIn: ['approved', 'rejected', 'completed'],
+              )
                   .snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.hasError) return const Center(child: Text('Lỗi tải dữ liệu'));
-                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
                 final apps = snapshot.data!.docs;
-                if (apps.isEmpty) return const Center(child: Text('Chưa có đơn ứng tuyển nào'));
+
+                if (apps.isEmpty) {
+                  return const Center(child: Text('No applications'));
+                }
 
                 return ListView.builder(
                   itemCount: apps.length,
                   itemBuilder: (context, index) {
-                    final data = apps[index].data() as Map<String, dynamic>;
-                    final studentId = data['studentId'] ?? '';
-                    final positionId = data['positionId'] ?? '';
-                    final status = data['status'] ?? 'submitted';
+                    final app = apps[index];
+                    final data = app.data() as Map<String, dynamic>;
 
-                    return Dismissible(
-                      key: Key(apps[index].id),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        color: Colors.red,
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: const Icon(Icons.delete, color: Colors.white),
-                      ),
-                      confirmDismiss: (direction) async {
-                        return await showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Xác nhận xóa'),
-                            content: const Text('Bạn có chắc muốn xóa vĩnh viễn đơn ứng tuyển này không?'),
-                            actions: [
-                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Hủy')),
-                              TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Xóa', style: TextStyle(color: Colors.red))),
-                            ],
+                    final studentId = data['studentId'];
+                    final positionId = data['positionId'];
+                    final status = data['status'];
+
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      child: ListTile(
+                        title: FutureBuilder<String>(
+                          future: _getStudentName(studentId),
+                          builder: (context, snapshot) => Text(
+                            'Sinh viên: ${snapshot.data ?? 'Loading...'}',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold),
                           ),
-                        );
-                      },
-                      onDismissed: (direction) async {
-                        await FirebaseFirestore.instance.collection('applications').doc(apps[index].id).delete();
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã xóa đơn ứng tuyển')));
-                      },
-                      child: Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        child: ListTile(
-                          title: FutureBuilder<String>(
-                            future: _getStudentName(studentId),
-                            builder: (context, nameSnapshot) => Text(
-                              'Sinh viên: ${nameSnapshot.data ?? "..."}',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            FutureBuilder<String>(
+                              future: _getPositionTitle(positionId),
+                              builder: (context, snapshot) => Text(
+                                  'Vị trí: ${snapshot.data ?? '...'}'),
                             ),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              FutureBuilder<String>(
-                                future: _getPositionTitle(positionId),
-                                builder: (context, titleSnapshot) => Text('Vị trí: ${titleSnapshot.data ?? "..."}'),
+                            Text('Trạng thái: $status'),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // ===== PENDING =====
+                            if (status == 'submitted') ...[
+                              IconButton(
+                                icon: const Icon(Icons.check,
+                                    color: Colors.green),
+                                onPressed: () {
+                                  app.reference
+                                      .update({'status': 'approved'});
+                                },
                               ),
-                              Text('Trạng thái: $status'),
+                              IconButton(
+                                icon: const Icon(Icons.close,
+                                    color: Colors.red),
+                                onPressed: () {
+                                  app.reference
+                                      .update({'status': 'rejected'});
+                                },
+                              ),
                             ],
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (status == 'submitted') ...[
-                                IconButton(
-                                  icon: const Icon(Icons.check, color: Colors.green),
-                                  onPressed: () => FirebaseFirestore.instance.collection('applications').doc(apps[index].id).update({'status': 'approved'}),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.close, color: Colors.red),
-                                  onPressed: () => FirebaseFirestore.instance.collection('applications').doc(apps[index].id).update({'status': 'rejected'}),
-                                ),
-                              ],
-                              if (status == 'approved')
-                                IconButton(
-                                  icon: const Icon(Icons.assignment_turned_in, color: Colors.blue),
-                                  onPressed: () => FirebaseFirestore.instance.collection('applications').doc(apps[index].id).update({'status': 'completed'}),
-                                ),
-                              if (status == 'completed') const Icon(Icons.verified, color: Colors.blue),
-                              if (status == 'rejected') const Icon(Icons.block, color: Colors.grey),
-                            ],
-                          ),
+
+                            // ===== APPROVED → COMPLETED =====
+                            if (status == 'approved')
+                              IconButton(
+                                icon: const Icon(
+                                    Icons.assignment_turned_in,
+                                    color: Colors.blue),
+                                onPressed: () {
+                                  app.reference
+                                      .update({'status': 'completed'});
+                                },
+                              ),
+
+                            // ===== STATUS ICONS =====
+                            if (status == 'completed')
+                              const Icon(Icons.verified,
+                                  color: Colors.blue),
+                            if (status == 'rejected')
+                              const Icon(Icons.block,
+                                  color: Colors.grey),
+                          ],
                         ),
                       ),
                     );
@@ -155,18 +259,14 @@ class CompanyHomePage extends StatelessWidget {
               },
             ),
           ),
+
+          // ================= CREATE POSITION =================
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: ElevatedButton(
-              onPressed: () async {
-                await PositionService().createPosition(
-                    title: "Intern Firebase Developer",
-                    description: "Thực tập phát triển ứng dụng di động",
-                    requirements: ["Dart", "Flutter", "Firebase"],
-                    startDate: DateTime.now()
-                );
-              },
-              child: const Text('Tạo vị trí mới'),
+            padding: const EdgeInsets.all(16),
+            child: ElevatedButton.icon(
+              onPressed: _showCreatePositionDialog, // Gọi hàm mở Form
+              icon: const Icon(Icons.add),
+              label: const Text('Đăng vị trí thực tập mới'),
             ),
           ),
         ],

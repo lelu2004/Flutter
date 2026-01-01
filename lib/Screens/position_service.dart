@@ -10,28 +10,38 @@ class PositionService {
     required String description,
     required List<String> requirements,
     required DateTime startDate,
+    required int maxSlots,
+
   }) async {
     try {
       String? companyId = _auth.currentUser?.uid;
+      if (companyId == null) throw Exception("Chưa đăng nhập");
 
-      if (companyId == null) {
-        throw Exception("Người dùng chưa đăng nhập hoặc không có quyền.");
+      // 1. Kiểm tra xem công ty này đã có vị trí trùng tên và đang hoạt động chưa
+      final duplicate = await _firestore
+          .collection('positions')
+          .where('companyId', isEqualTo: companyId)
+          .where('title', isEqualTo: title)
+          .where('isActive', isEqualTo: true)
+          .get();
+
+      if (duplicate.docs.isNotEmpty) {
+        throw Exception("Bạn đã đăng tuyển vị trí này rồi. Hãy cập nhật vị trí cũ nếu cần.");
       }
 
+      // 2. Nếu không trùng thì mới tạo
       Map<String, dynamic> positionData = {
         'companyId': companyId,
         'title': title,
         'description': description,
         'requirements': requirements,
         'startDate': Timestamp.fromDate(startDate),
+        'maxSlots': maxSlots, // Lưu số lượng tối đa
         'isActive': true,
         'createdAt': FieldValue.serverTimestamp(),
       };
       await _firestore.collection('positions').add(positionData);
-
-      print("Backend: Đã tạo vị trí thực tập thành công.");
     } catch (e) {
-      print("Backend Error - CreatePosition: $e");
       rethrow;
     }
   }
