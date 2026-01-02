@@ -39,16 +39,6 @@ class ApplicationService {
       throw Exception("Vị trí này đã tuyển đủ người.");
     }
 
-    final approvedApps = await _firestore
-        .collection('applications')
-        .where('positionId', isEqualTo: positionId)
-        .where('status', isEqualTo: 'approved')
-        .get();
-
-    if (approvedApps.docs.length >= maxSlots) {
-      throw Exception("Vị trí này đã tuyển đủ người.");
-    }
-
     final checkDuplicate = await _firestore
         .collection('applications')
         .where('studentId', isEqualTo: studentId)
