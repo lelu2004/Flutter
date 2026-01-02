@@ -20,6 +20,26 @@ class ApplicationService {
       return 0;
     }
   }
+
+  Future<bool> hasUserApplied(String positionId) async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid == null) return false;
+
+      final snapshot = await _firestore
+          .collection('applications')
+          .where('studentId', isEqualTo: uid)
+          .where('positionId', isEqualTo: positionId)
+          .limit(1) // Chỉ cần tìm thấy 1 bản ghi là đủ
+          .get();
+
+      return snapshot.docs.isNotEmpty;
+    } catch (e) {
+      print("Lỗi khi kiểm tra đơn trùng: $e");
+      return false;
+    }
+  }
+
   Future<void> submitApplication({
     required String positionId,
     required String companyId,
@@ -39,6 +59,9 @@ class ApplicationService {
       throw Exception("Vị trí này đã tuyển đủ người.");
     }
 
+    if (await hasUserApplied(positionId)) {
+      throw Exception("Bạn đã nộp đơn ứng tuyển cho vị trí này rồi.");
+    }
     final checkDuplicate = await _firestore
         .collection('applications')
         .where('studentId', isEqualTo: studentId)
@@ -56,6 +79,29 @@ class ApplicationService {
       'submittedAt': FieldValue.serverTimestamp(),
       'cvUrl': cvUrl,
     });
+  }
+
+  // Thêm hàm này vào class ApplicationService trong application_service.dart
+  Future<String?> getApplicationStatus(String positionId) async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid == null) return null;
+
+      final snapshot = await _firestore
+          .collection('applications')
+          .where('studentId', isEqualTo: uid)
+          .where('positionId', isEqualTo: positionId)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        // Trả về trường 'status' thực tế (submitted, approved, rejected, completed)
+        return snapshot.docs.first.data()['status'] as String?;
+      }
+    } catch (e) {
+      print("Lỗi lấy trạng thái: $e");
+    }
+    return null; // Trả về null nếu chưa nộp đơn
   }
 
   // 3. Bổ sung thêm: Truy vấn lịch sử THEO SINH VIÊN (Yêu cầu số 5)

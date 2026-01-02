@@ -84,7 +84,6 @@ class _UserHomePageState extends State<UserHomePage> {
         const SnackBar(content: Text('Nộp đơn thành công!')),
       );
     } catch (e) {
-      // Hiển thị lỗi "Bạn đã nộp đơn..." từ ApplicationService
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString().replaceAll("Exception: ", "")), backgroundColor: Colors.orange),
       );
@@ -163,19 +162,17 @@ class _UserHomePageState extends State<UserHomePage> {
 
   // ================= AVAILABLE POSITIONS =================
   Widget _buildAvailablePositions() {
+    final ApplicationService _appService = ApplicationService();
+
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('positions')
           .where('isActive', isEqualTo: true)
           .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const CircularProgressIndicator();
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
 
         final positions = snapshot.data!.docs;
-        if (positions.isEmpty) {
-          return const Text('No internship positions available.');
-        }
-
         return ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -185,37 +182,66 @@ class _UserHomePageState extends State<UserHomePage> {
             final positionId = positions[index].id;
             final companyId = data['companyId'];
 
-            return Card(
-              child: ListTile(
-                title: Text(data['title'] ?? 'No title'),
-                subtitle: FutureBuilder<int>(
-                  future: ApplicationService().getApprovedCount(positionId), // Sử dụng hàm tại đây
-                  builder: (context, countSnapshot) {
-                    int approved = countSnapshot.data ?? 0;
-                    int maxSlots = data['maxSlots'] ?? 0;
-                    return Text("Mô tả: ${data['description']}\nĐã tuyển: $approved/$maxSlots");
-                  },
-                ),
-                trailing: FutureBuilder<int>(
-                  future: ApplicationService().getApprovedCount(positionId),
-                  builder: (context, countSnapshot) {
-                    int approved = countSnapshot.data ?? 0;
-                    int maxSlots = data['maxSlots'] ?? 0;
+            return FutureBuilder<List<dynamic>>(
+              future: Future.wait([
+                _appService.getApprovedCount(positionId),
+                _appService.getApplicationStatus(positionId), // Gọi hàm lấy trạng thái thực tế
+              ]),
+              builder: (context, futureSnapshot) {
+                if (!futureSnapshot.hasData) return const SizedBox(height: 80);
 
-                    // Nếu đã đủ người thì hiện chữ "Full", ngược lại hiện nút Apply
-                    return (approved >= maxSlots && maxSlots > 0)
-                        ? const Text("HẾT CHỖ", style: TextStyle(color: Colors.red))
+                final int approvedCount = futureSnapshot.data![0];
+                final String? currentStatus = futureSnapshot.data![1]; // Lấy status ở đây
+                final int maxSlots = data['maxSlots'] ?? 10;
+
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  child: ListTile(
+                    title: Text(data['title'] ?? 'No title', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text("Đã tuyển: $approvedCount/$maxSlots"),
+
+                    // LOGIC HIỂN THỊ THEO TRẠNG THÁI THỰC TẾ
+                    trailing: currentStatus != null
+                        ? _buildStatusChip(currentStatus) // Hàm phụ để vẽ nhãn màu sắc
+                        : (approvedCount >= maxSlots
+                        ? const Text("HẾT CHỖ", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold))
                         : ElevatedButton(
                       child: const Text('Apply'),
                       onPressed: () => _applyForPosition(positionId, companyId),
-                    );
-                  },
-                ),
-              ),
+                    )),
+                  ),
+                );
+              },
             );
           },
         );
       },
+    );
+  }
+
+// Hàm phụ để tạo nhãn trạng thái đẹp mắt
+  Widget _buildStatusChip(String status) {
+    String label = "ĐÃ NỘP";
+    Color color = Colors.orangeAccent;
+
+    switch (status.toLowerCase()) {
+      case 'approved':
+        label = "ĐÃ ĐƯỢC DUYỆT";
+        color = Colors.green;
+        break;
+      case 'rejected':
+        label = "BỊ TỪ CHỐI";
+        color = Colors.redAccent;
+        break;
+      case 'completed':
+        label = "HOÀN THÀNH";
+        color = Colors.blue;
+        break;
+    }
+
+    return Chip(
+      label: Text(label, style: const TextStyle(color: Colors.white, fontSize: 10)),
+      backgroundColor: color,
     );
   }
   Widget _buildActiveApplications() {

@@ -20,14 +20,14 @@ class _AdminHomePageState extends State<AdminHomePage>
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
         if (data['role'] == 'company' && data['companyName'] != null) {
-          return data['companyName']; // Kết quả sẽ là "SamSung"
+          return data['companyName'];
         }
         return data['fullName'] ?? 'Chưa cập nhật tên';
       }
     } catch (e) {
       debugPrint("Lỗi lấy tên: $e");
     }
-    return 'ID: $uid'; // Trả về ID nếu không tìm thấy dữ liệu
+    return 'ID: $uid';
   }
 
   Future<String> _getPositionTitle(String positionId) async {

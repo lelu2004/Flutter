@@ -110,7 +110,7 @@ class _CompanyHomePageState extends State<CompanyHomePage> {
   @override
   Widget build(BuildContext context) {
     final companyId = FirebaseAuth.instance.currentUser!.uid;
-
+    debugPrint("Đang tìm đơn cho Company ID: $companyId");
     return Scaffold(
       appBar: AppBar(
         title: const Text('Trang Chủ Công Ty'),
@@ -264,7 +264,7 @@ class _CompanyHomePageState extends State<CompanyHomePage> {
           Padding(
             padding: const EdgeInsets.all(16),
             child: ElevatedButton.icon(
-              onPressed: _showCreatePositionDialog, // Gọi hàm mở Form
+              onPressed: _showCreatePositionDialog,
               icon: const Icon(Icons.add),
               label: const Text('Đăng vị trí thực tập mới'),
             ),
