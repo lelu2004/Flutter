@@ -8,14 +8,15 @@ import 'Screens/admin_home_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized(); // Bắt buộc
-  await Firebase.initializeApp(); // Bắt buộc để dùng Firebase
+  WidgetsFlutterBinding.ensureInitialized(); // Bắt buộc khởi tạo
+  await Firebase.initializeApp(); // Khởi tạo Firebase
   runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
   final AuthService _authService = AuthService();
   MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -24,17 +25,24 @@ class MyApp extends StatelessWidget {
       home: StreamBuilder<User?>(
         stream: _authService.authStateChanges,
         builder: (context, snapshot) {
-          if(snapshot.connectionState == ConnectionState.waiting){
-            return const CircularProgressIndicator();
+          // 1. Xử lý trạng thái đang kiểm tra phiên đăng nhập
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
           }
-          if(snapshot.hasData){
-            // User is logged in
+
+          if (snapshot.hasData && snapshot.data != null) {
             return FutureBuilder<String?>(
-            future: _authService.getUserRole(snapshot.data!.uid),
-            builder: (context, roleSnapshot) {
-              if(roleSnapshot.connectionState == ConnectionState.waiting){
-                return const CircularProgressIndicator();
-              }
+              future: _authService.getUserRole(snapshot.data!.uid),
+              builder: (context, roleSnapshot) {
+                // Đang tải Role từ Firestore
+                if (roleSnapshot.connectionState == ConnectionState.waiting) {
+                  return const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  );
+                }
+
                 final String? role = roleSnapshot.data;
                 if (role == 'admin') {
                   return const AdminHomePage();
@@ -48,10 +56,9 @@ class MyApp extends StatelessWidget {
               },
             );
           }
-          return LoginScreen();
+          return const LoginScreen();
         },
       ),
     );
   }
 }
-

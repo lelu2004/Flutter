@@ -101,25 +101,6 @@ class ApplicationService {
     } catch (e) {
       print("Lỗi lấy trạng thái: $e");
     }
-    return null; // Trả về null nếu chưa nộp đơn
-  }
-
-  // 3. Bổ sung thêm: Truy vấn lịch sử THEO SINH VIÊN (Yêu cầu số 5)
-  Stream<QuerySnapshot> getStudentInternshipHistory(String studentId) {
-    return _firestore
-        .collection('applications')
-        .where('studentId', isEqualTo: studentId)
-        .where('status', isEqualTo: 'completed')
-        .orderBy('submittedAt', descending: true)
-        .snapshots();
-  }
-
-  // 4. Bổ sung thêm: Truy vấn lịch sử THEO CHƯƠNG TRÌNH (Dùng cho Admin/Company)
-  Stream<QuerySnapshot> getProgramHistory(String companyId) {
-    return _firestore
-        .collection('applications')
-        .where('companyId', isEqualTo: companyId)
-        .where('status', isEqualTo: 'completed')
-        .snapshots();
+    return null;
   }
 }

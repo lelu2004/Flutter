@@ -110,7 +110,6 @@ class _CompanyHomePageState extends State<CompanyHomePage> {
   @override
   Widget build(BuildContext context) {
     final companyId = FirebaseAuth.instance.currentUser!.uid;
-    debugPrint("Đang tìm đơn cho Company ID: $companyId");
     return Scaffold(
       appBar: AppBar(
         title: const Text('Trang Chủ Công Ty'),

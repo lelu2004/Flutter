@@ -28,14 +28,13 @@ class PositionService {
         throw Exception("Bạn đã đăng tuyển vị trí này rồi. Hãy cập nhật vị trí cũ nếu cần.");
       }
 
-      // 2. Nếu không trùng thì mới tạo
       Map<String, dynamic> positionData = {
         'companyId': companyId,
         'title': title,
         'description': description,
         'requirements': requirements,
         'startDate': Timestamp.fromDate(startDate),
-        'maxSlots': maxSlots, // Lưu số lượng tối đa
+        'maxSlots': maxSlots,
         'isActive': true,
         'createdAt': FieldValue.serverTimestamp(),
       };
@@ -54,24 +53,4 @@ class PositionService {
     }
   }
 
-  // 2. Đóng/Mở vị trí thực tập (Soft Delete)
-  Future<void> togglePositionStatus(String docId, bool isActive) async {
-    try {
-      await _firestore.collection('positions').doc(docId).update({
-        'isActive': isActive,
-      });
-    } catch (e) {
-      print("Backend Error - ToggleStatus: $e");
-      rethrow;
-    }
-  }
-
-  // Hàm lấy danh sách vị trí của riêng công ty đó (để quản lý)
-  Stream<QuerySnapshot> getCompanyPositions() {
-    String companyId = _auth.currentUser?.uid ?? '';
-    return _firestore
-        .collection('positions')
-        .where('companyId', isEqualTo: companyId)
-        .snapshots();
-  }
 }
