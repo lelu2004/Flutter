@@ -13,6 +13,37 @@ class _AdminHomePageState extends State<AdminHomePage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
+  Future<String> _getNameFromUid(String uid) async {
+    if (uid.isEmpty) return 'Không xác định';
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        if (data['role'] == 'company' && data['companyName'] != null) {
+          return data['companyName']; // Kết quả sẽ là "SamSung"
+        }
+        return data['fullName'] ?? 'Chưa cập nhật tên';
+      }
+    } catch (e) {
+      debugPrint("Lỗi lấy tên: $e");
+    }
+    return 'ID: $uid'; // Trả về ID nếu không tìm thấy dữ liệu
+  }
+
+  Future<String> _getPositionTitle(String positionId) async {
+    if (positionId.isEmpty) return 'Vị trí không rõ';
+    try {
+      final doc = await FirebaseFirestore.instance.collection('positions').doc(positionId).get();
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        return data['title'] ?? 'Không có tiêu đề';
+      }
+    } catch (e) {
+      debugPrint("Lỗi lấy tiêu đề: $e");
+    }
+    return 'ID: $positionId';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -84,7 +115,10 @@ class _AdminHomePageState extends State<AdminHomePage>
               margin: const EdgeInsets.all(8),
               child: ListTile(
                 title: Text(data['title'] ?? 'No title'),
-                subtitle: Text('Company ID: ${data['companyId']}'),
+                subtitle: FutureBuilder<String>(
+                  future: _getNameFromUid(data['companyId'] ?? ''),
+                  builder: (context, res) => Text('Công ty: ${res.data ?? "Đang tải..."}'),
+                ),
                 trailing: IconButton(
                   icon: const Icon(Icons.delete, color: Colors.red),
                   onPressed: () async {
@@ -122,9 +156,18 @@ class _AdminHomePageState extends State<AdminHomePage>
             return Card(
               margin: const EdgeInsets.all(8),
               child: ListTile(
-                title: Text('Student ID: ${data['studentId']}'),
-                subtitle: Text(
-                  'Position ID: ${data['positionId']}\nStatus: ${data['status']}',
+                title: FutureBuilder<String>(
+                  future: _getNameFromUid(data['studentId'] ?? ''),
+                  builder: (context, res) => Text(
+                    'Sinh viên: ${res.data ?? "Đang tải..."}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                subtitle: FutureBuilder<String>(
+                  future: _getPositionTitle(data['positionId'] ?? ''),
+                  builder: (context, res) => Text(
+                    'Vị trí: ${res.data ?? "..."}\nTrạng thái: ${data['status']}',
+                  ),
                 ),
                 trailing: IconButton(
                   icon: const Icon(Icons.delete, color: Colors.red),

@@ -90,18 +90,15 @@ class _UserHomePageState extends State<UserHomePage> {
       );
     }
   }
-  //
-  // // ================= GET POSITION TITLE =================
-  // Future<String> _getPositionTitle(String positionId) async {
-  //   final doc = await FirebaseFirestore.instance
-  //       .collection('positions')
-  //       .doc(positionId)
-  //       .get();
-  //
-  //   return doc.exists
-  //       ? (doc.data() as Map<String, dynamic>)['title'] ?? 'No title'
-  //       : 'Position closed';
-  // }
+  Color _getStatusColor(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'approved': return Colors.greenAccent;
+      case 'rejected': return Colors.redAccent;
+      case 'submitted': return Colors.orangeAccent;
+      case 'completed': return Colors.blueAccent;
+      default: return Colors.grey;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -191,13 +188,26 @@ class _UserHomePageState extends State<UserHomePage> {
             return Card(
               child: ListTile(
                 title: Text(data['title'] ?? 'No title'),
-                subtitle: Text(data['description'] ?? ''),
-                trailing: ElevatedButton(
-                  child: const Text('Apply'),
-                  onPressed: () async {
-                    await ApplicationService().submitApplication(
-                      positionId: positionId,
-                      companyId: companyId,
+                subtitle: FutureBuilder<int>(
+                  future: ApplicationService().getApprovedCount(positionId), // Sử dụng hàm tại đây
+                  builder: (context, countSnapshot) {
+                    int approved = countSnapshot.data ?? 0;
+                    int maxSlots = data['maxSlots'] ?? 0;
+                    return Text("Mô tả: ${data['description']}\nĐã tuyển: $approved/$maxSlots");
+                  },
+                ),
+                trailing: FutureBuilder<int>(
+                  future: ApplicationService().getApprovedCount(positionId),
+                  builder: (context, countSnapshot) {
+                    int approved = countSnapshot.data ?? 0;
+                    int maxSlots = data['maxSlots'] ?? 0;
+
+                    // Nếu đã đủ người thì hiện chữ "Full", ngược lại hiện nút Apply
+                    return (approved >= maxSlots && maxSlots > 0)
+                        ? const Text("HẾT CHỖ", style: TextStyle(color: Colors.red))
+                        : ElevatedButton(
+                      child: const Text('Apply'),
+                      onPressed: () => _applyForPosition(positionId, companyId),
                     );
                   },
                 ),
@@ -224,12 +234,16 @@ class _UserHomePageState extends State<UserHomePage> {
               color: Colors.grey[50],
               child: ListTile(
                 title: Text('Vị trí ID: ${data['positionId']}'),
-                trailing: Chip(label: Text(data['status'].toString().toUpperCase())),
+                trailing: Chip(
+                  label: Text(data['status'].toString().toUpperCase()),
+                  backgroundColor: _getStatusColor(data['status']),
+                ),
               ),
             );
           },
         );
       },
     );
+
   }
 }

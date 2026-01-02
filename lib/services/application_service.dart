@@ -5,13 +5,6 @@ class ApplicationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // 1. Của bạn: Hàm xác nhận hoàn thành thực tập
-  Future<void> completeInternship(String appId) async {
-    await _firestore
-        .collection('applications')
-        .doc(appId)
-        .update({'status': 'completed'});
-  }
   Future<int> getApprovedCount(String positionId) async {
     try {
       AggregateQuerySnapshot snapshot = await _firestore
@@ -27,7 +20,6 @@ class ApplicationService {
       return 0;
     }
   }
-  // 2. Của bạn: Hàm nộp đơn có kiểm tra trùng lặp (Rất tốt cho Yêu cầu 3)
   Future<void> submitApplication({
     required String positionId,
     required String companyId,
@@ -38,9 +30,14 @@ class ApplicationService {
 
     DocumentSnapshot posDoc = await _firestore.collection('positions').doc(positionId).get();
     if (!posDoc.exists) throw Exception("Vị trí không tồn tại.");
-
     final posData = posDoc.data() as Map<String, dynamic>;
     int maxSlots = posData['maxSlots'] ?? 10;
+
+    int approvedCount = await getApprovedCount(positionId);
+
+    if (approvedCount >= maxSlots) {
+      throw Exception("Vị trí này đã tuyển đủ người.");
+    }
 
     final approvedApps = await _firestore
         .collection('applications')
