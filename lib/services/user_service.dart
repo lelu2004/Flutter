@@ -39,7 +39,7 @@ class UserService {
         'university': university,
         'major': major,
         'skills': skills,
-        'lastUpdated': FieldValue.serverTimestamp(), // Lưu thời gian cập nhật
+        'lastUpdated': FieldValue.serverTimestamp(),
       });
       print("Backend: Cập nhật thông tin sinh viên thành công.");
     } catch (e) {

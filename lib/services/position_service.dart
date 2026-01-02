@@ -17,7 +17,6 @@ class PositionService {
       String? companyId = _auth.currentUser?.uid;
       if (companyId == null) throw Exception("Chưa đăng nhập");
 
-      // 1. Kiểm tra xem công ty này đã có vị trí trùng tên và đang hoạt động chưa
       final duplicate = await _firestore
           .collection('positions')
           .where('companyId', isEqualTo: companyId)
@@ -45,7 +44,8 @@ class PositionService {
       rethrow;
     }
   }
-  Future<void> updatePosition(String docId, Map<String, dynamic> updatedData) async {
+  Future<void> updatePosition(String docId, Map<String, dynamic> updatedData)
+  async {
     try {
       await _firestore.collection('positions').doc(docId).update(updatedData);
     } catch (e) {

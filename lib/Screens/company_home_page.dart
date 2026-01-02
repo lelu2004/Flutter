@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:my_firebase_app/Screens/position_service.dart';
+import 'package:my_firebase_app/services/position_service.dart';
 
 class CompanyHomePage extends StatefulWidget {
   const CompanyHomePage({super.key});

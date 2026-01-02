@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:my_firebase_app/Screens/application_service.dart';
-import 'package:my_firebase_app/Screens/user_service.dart';
+import 'package:my_firebase_app/services/application_service.dart';
+import 'package:my_firebase_app/services/user_service.dart';
 
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});

@@ -43,7 +43,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _selectedRole!,
         additionalData,
       );
-      // Quay về login hoặc home
       Navigator.pop(context);
     } catch (e) {
       setState(() {

@@ -25,6 +25,10 @@ class _AdminHomePageState extends State<AdminHomePage>
     super.dispose();
   }
 
+  String _getFullName(Map<String, dynamic> data) {
+    return data['fullName'] ?? 'Unknown';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -56,15 +60,19 @@ class _AdminHomePageState extends State<AdminHomePage>
     );
   }
 
-  // ================= POSITIONS =================
+  //Positions
   Widget _buildPositionsTab() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('positions').snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const CircularProgressIndicator();
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
         final docs = snapshot.data!.docs;
-        if (docs.isEmpty) return const Center(child: Text('No positions'));
+        if (docs.isEmpty) {
+          return const Center(child: Text('No positions'));
+        }
 
         return ListView.builder(
           itemCount: docs.length,
@@ -73,6 +81,7 @@ class _AdminHomePageState extends State<AdminHomePage>
             final data = doc.data() as Map<String, dynamic>;
 
             return Card(
+              margin: const EdgeInsets.all(8),
               child: ListTile(
                 title: Text(data['title'] ?? 'No title'),
                 subtitle: Text('Company ID: ${data['companyId']}'),
@@ -90,15 +99,19 @@ class _AdminHomePageState extends State<AdminHomePage>
     );
   }
 
-  // ================= APPLICATIONS =================
+  //Application
   Widget _buildApplicationsTab() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('applications').snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const CircularProgressIndicator();
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
         final docs = snapshot.data!.docs;
-        if (docs.isEmpty) return const Center(child: Text('No applications'));
+        if (docs.isEmpty) {
+          return const Center(child: Text('No applications'));
+        }
 
         return ListView.builder(
           itemCount: docs.length,
@@ -107,10 +120,11 @@ class _AdminHomePageState extends State<AdminHomePage>
             final data = doc.data() as Map<String, dynamic>;
 
             return Card(
+              margin: const EdgeInsets.all(8),
               child: ListTile(
-                title: Text('Student: ${data['studentId']}'),
+                title: Text('Student ID: ${data['studentId']}'),
                 subtitle: Text(
-                  'Position: ${data['positionId']}\nStatus: ${data['status']}',
+                  'Position ID: ${data['positionId']}\nStatus: ${data['status']}',
                 ),
                 trailing: IconButton(
                   icon: const Icon(Icons.delete, color: Colors.red),
@@ -126,15 +140,22 @@ class _AdminHomePageState extends State<AdminHomePage>
     );
   }
 
-  // ================= STUDENTS =================
+  //Students
   Widget _buildStudentsTab() {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'student')
+          .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const CircularProgressIndicator();
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
         final docs = snapshot.data!.docs;
-        if (docs.isEmpty) return const Center(child: Text('No students'));
+        if (docs.isEmpty) {
+          return const Center(child: Text('No students'));
+        }
 
         return ListView.builder(
           itemCount: docs.length,
@@ -143,8 +164,9 @@ class _AdminHomePageState extends State<AdminHomePage>
             final data = doc.data() as Map<String, dynamic>;
 
             return Card(
+              margin: const EdgeInsets.all(8),
               child: ListTile(
-                title: Text(data['fullName'] ?? ''),
+                title: Text(_getFullName(data)),
                 subtitle: Text(data['email'] ?? ''),
                 trailing: IconButton(
                   icon: const Icon(Icons.delete, color: Colors.red),
